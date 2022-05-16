@@ -16,6 +16,7 @@ find_package(std_srvs REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(nav2_core REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(behaviortree_cpp_v3_ros2_publisher REQUIRED)
 
 nav2_package()
 
@@ -45,6 +46,7 @@ set(dependencies
   nav2_util
   nav2_core
   tf2_ros
+  behaviortree_cpp_v3_ros2_publisher
 )
 
 add_library(${library_name} SHARED

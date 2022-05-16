@@ -152,6 +152,7 @@ bool BtActionServer<ActionT>::on_cleanup()
   client_node_.reset();
   action_server_.reset();
   topic_logger_.reset();
+//   tree_ros_server_.reset();
   plugin_lib_names_.clear();
   current_bt_xml_filename_.clear();
   blackboard_.reset();
@@ -190,7 +191,7 @@ bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filena
 
   // Create the Behavior Tree from the XML input
   tree_ = bt_->createTreeFromText(xml_string, blackboard_);
-  topic_logger_ = std::make_unique<RosTopicLogger>(client_node_, tree_);
+  topic_logger_ = std::make_unique<BTRosPublisher>(client_node_, tree_, filename);
 
   current_bt_xml_filename_ = filename;
 
@@ -232,6 +233,7 @@ void BtActionServer<ActionT>::executeCallback()
         on_preempt_callback_(action_server_->get_pending_goal());
       }
       topic_logger_->flush();
+
       on_loop_callback_();
     };
 
@@ -263,6 +265,7 @@ void BtActionServer<ActionT>::executeCallback()
       action_server_->terminate_all(result);
       break;
   }
+
 }
 
 }  // namespace nav2_behavior_tree
