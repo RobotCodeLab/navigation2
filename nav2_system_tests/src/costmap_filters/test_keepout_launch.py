@@ -62,10 +62,14 @@ def generate_launch_description():
         SetEnvironmentVariable('RCUTILS_LOGGING_USE_STDOUT', '1'),
 
         # Launch gazebo server for simulation
+        # ExecuteProcess(
+        #     cmd=['gzserver', '-s', 'libgazebo_ros_init.so',
+        #          '--minimal_comms', world],
+        #     output='screen'),
         ExecuteProcess(
-            cmd=['gzserver', '-s', 'libgazebo_ros_init.so',
-                 '--minimal_comms', world],
-            output='screen'),
+        cmd=['gazebo', '-s', 'libgazebo_ros_init.so',
+                '--minimal_comms', world],
+        output='screen'),
 
         # TODO(orduno) Launch the robot state publisher instead
         #              using a local copy of TB3 urdf file
