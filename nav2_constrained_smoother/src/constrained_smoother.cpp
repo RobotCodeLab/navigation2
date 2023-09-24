@@ -21,10 +21,9 @@
 #include <vector>
 
 #include "nav2_constrained_smoother/constrained_smoother.hpp"
-#include "nav2_core/exceptions.hpp"
 #include "nav2_util/node_utils.hpp"
 #include "nav2_util/geometry_utils.hpp"
-#include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
+#include "nav2_core/smoother_exceptions.hpp"
 
 #include "pluginlib/class_loader.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -40,9 +39,9 @@ namespace nav2_constrained_smoother
 
 void ConstrainedSmoother::configure(
   const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
-  std::string name, const std::shared_ptr<tf2_ros::Buffer> & tf,
-  const std::shared_ptr<nav2_costmap_2d::CostmapSubscriber> & costmap_sub,
-  const std::shared_ptr<nav2_costmap_2d::FootprintSubscriber> &)
+  std::string name, std::shared_ptr<tf2_ros::Buffer> tf,
+  std::shared_ptr<nav2_costmap_2d::CostmapSubscriber> costmap_sub,
+  std::shared_ptr<nav2_costmap_2d::FootprintSubscriber>)
 {
   auto node = parent.lock();
   if (!node) {
@@ -138,8 +137,8 @@ bool ConstrainedSmoother::smooth(nav_msgs::msg::Path & path, const rclcpp::Durat
       logger_,
       "%s: failed to smooth plan, Ceres could not find a usable solution to optimize.",
       plugin_name_.c_str());
-    throw new nav2_core::PlannerException(
-            "Failed to smooth plan, Ceres could not find a usable solution.");
+    throw nav2_core::FailedToSmoothPath(
+            "Failed to smooth plan, Ceres could not find a usable solution");
   }
 
   // populate final path

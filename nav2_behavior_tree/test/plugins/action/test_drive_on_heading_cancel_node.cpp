@@ -19,7 +19,7 @@
 
 #include "behaviortree_cpp_v3/bt_factory.h"
 
-#include "../../test_action_server.hpp"
+#include "utils/test_action_server.hpp"
 #include "nav2_behavior_tree/plugins/action/drive_on_heading_cancel_node.hpp"
 #include "lifecycle_msgs/srv/change_state.hpp"
 
@@ -86,6 +86,7 @@ public:
     config_ = nullptr;
     node_.reset();
     action_server_.reset();
+    client_.reset();
     factory_.reset();
   }
 

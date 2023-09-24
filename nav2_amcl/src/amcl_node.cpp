@@ -59,7 +59,7 @@ namespace nav2_amcl
 using nav2_util::geometry_utils::orientationAroundZAxis;
 
 AmclNode::AmclNode(const rclcpp::NodeOptions & options)
-: nav2_util::LifecycleNode("amcl", "", true, options)
+: nav2_util::LifecycleNode("amcl", "", options)
 {
   RCLCPP_INFO(get_logger(), "Creating");
 
@@ -146,11 +146,11 @@ AmclNode::AmclNode(const rclcpp::NodeOptions & options)
 
   add_parameter(
     "max_particles", rclcpp::ParameterValue(2000),
-    "Minimum allowed number of particles");
+    "Maximum allowed number of particles");
 
   add_parameter(
     "min_particles", rclcpp::ParameterValue(500),
-    "Maximum allowed number of particles");
+    "Minimum allowed number of particles");
 
   add_parameter(
     "odom_frame_id", rclcpp::ParameterValue(std::string("odom")),
@@ -236,7 +236,8 @@ nav2_util::CallbackReturn
 AmclNode::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring");
-
+  callback_group_ = create_callback_group(
+    rclcpp::CallbackGroupType::MutuallyExclusive, false);
   initParameters();
   initTransforms();
   initParticleFilter();
@@ -245,7 +246,9 @@ AmclNode::on_configure(const rclcpp_lifecycle::State & /*state*/)
   initPubSub();
   initServices();
   initOdometry();
-
+  executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+  executor_->add_callback_group(callback_group_, get_node_base_interface());
+  executor_thread_ = std::make_unique<nav2_util::NodeThread>(executor_);
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -316,6 +319,8 @@ nav2_util::CallbackReturn
 AmclNode::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up");
+
+  executor_thread_.reset();
 
   // Get rid of the inputs first (services and message filter input), so we
   // don't continue to process incoming messages
@@ -674,7 +679,7 @@ AmclNode::laserReceived(sensor_msgs::msg::LaserScan::ConstSharedPtr laser_scan)
 
     // Resample the particles
     if (!(++resample_count_ % resample_interval_)) {
-      pf_update_resample(pf_);
+      pf_update_resample(pf_, reinterpret_cast<void *>(map_));
       resampled = true;
     }
 
@@ -802,6 +807,15 @@ bool AmclNode::updateFilter(
   RCLCPP_DEBUG(
     get_logger(), "Laser %d angles in base frame: min: %.3f inc: %.3f", laser_index, angle_min,
     angle_increment);
+
+  // Check the validity of range_max, must > 0.0
+  if (laser_scan->range_max <= 0.0) {
+    RCLCPP_WARN(
+      get_logger(), "wrong range_max of laser_scan data: %f. The message could be malformed."
+      " Ignore this message and stop updating.",
+      laser_scan->range_max);
+    return false;
+  }
 
   // Apply range min/max thresholds, if the user supplied them
   if (laser_max_range_ > 0.0) {
@@ -1153,18 +1167,53 @@ AmclNode::dynamicParametersCallback(
     if (param_type == ParameterType::PARAMETER_DOUBLE) {
       if (param_name == "alpha1") {
         alpha1_ = parameter.as_double();
+        //alpha restricted to be non-negative
+        if (alpha1_ < 0.0) {
+          RCLCPP_WARN(
+            get_logger(), "You've set alpha1 to be negative,"
+            " this isn't allowed, so the alpha1 will be set to be zero.");
+          alpha1_ = 0.0;
+        }
         reinit_odom = true;
       } else if (param_name == "alpha2") {
         alpha2_ = parameter.as_double();
+        //alpha restricted to be non-negative
+        if (alpha2_ < 0.0) {
+          RCLCPP_WARN(
+            get_logger(), "You've set alpha2 to be negative,"
+            " this isn't allowed, so the alpha2 will be set to be zero.");
+          alpha2_ = 0.0;
+        }
         reinit_odom = true;
       } else if (param_name == "alpha3") {
         alpha3_ = parameter.as_double();
+        //alpha restricted to be non-negative
+        if (alpha3_ < 0.0) {
+          RCLCPP_WARN(
+            get_logger(), "You've set alpha3 to be negative,"
+            " this isn't allowed, so the alpha3 will be set to be zero.");
+          alpha3_ = 0.0;
+        }
         reinit_odom = true;
       } else if (param_name == "alpha4") {
         alpha4_ = parameter.as_double();
+        //alpha restricted to be non-negative
+        if (alpha4_ < 0.0) {
+          RCLCPP_WARN(
+            get_logger(), "You've set alpha4 to be negative,"
+            " this isn't allowed, so the alpha4 will be set to be zero.");
+          alpha4_ = 0.0;
+        }
         reinit_odom = true;
       } else if (param_name == "alpha5") {
         alpha5_ = parameter.as_double();
+        //alpha restricted to be non-negative
+        if (alpha5_ < 0.0) {
+          RCLCPP_WARN(
+            get_logger(), "You've set alpha5 to be negative,"
+            " this isn't allowed, so the alpha5 will be set to be zero.");
+          alpha5_ = 0.0;
+        }
         reinit_odom = true;
       } else if (param_name == "beam_skip_distance") {
         beam_skip_distance_ = parameter.as_double();
@@ -1426,13 +1475,14 @@ AmclNode::initTransforms()
   RCLCPP_INFO(get_logger(), "initTransforms");
 
   // Initialize transform listener and broadcaster
-  tf_buffer_ = std::make_shared<tf2_ros::Buffer>(rclcpp_node_->get_clock());
+  tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
   auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
-    rclcpp_node_->get_node_base_interface(),
-    rclcpp_node_->get_node_timers_interface());
+    get_node_base_interface(),
+    get_node_timers_interface(),
+    callback_group_);
   tf_buffer_->setCreateTimerInterface(timer_interface);
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-  tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(rclcpp_node_);
+  tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(shared_from_this());
 
   sent_first_transform_ = false;
   latest_tf_valid_ = false;
@@ -1442,11 +1492,18 @@ AmclNode::initTransforms()
 void
 AmclNode::initMessageFilters()
 {
-  laser_scan_sub_ = std::make_unique<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>(
-    rclcpp_node_.get(), scan_topic_, rmw_qos_profile_sensor_data);
+  auto sub_opt = rclcpp::SubscriptionOptions();
+  sub_opt.callback_group = callback_group_;
+  laser_scan_sub_ = std::make_unique<message_filters::Subscriber<sensor_msgs::msg::LaserScan,
+      rclcpp_lifecycle::LifecycleNode>>(
+    shared_from_this(), scan_topic_, rmw_qos_profile_sensor_data, sub_opt);
 
   laser_scan_filter_ = std::make_unique<tf2_ros::MessageFilter<sensor_msgs::msg::LaserScan>>(
-    *laser_scan_sub_, *tf_buffer_, odom_frame_id_, 10, rclcpp_node_, transform_tolerance_);
+    *laser_scan_sub_, *tf_buffer_, odom_frame_id_, 10,
+    get_node_logging_interface(),
+    get_node_clock_interface(),
+    transform_tolerance_);
+
 
   laser_scan_connection_ = laser_scan_filter_->registerCallback(
     std::bind(
@@ -1523,8 +1580,7 @@ AmclNode::initParticleFilter()
   // Create the particle filter
   pf_ = pf_alloc(
     min_particles_, max_particles_, alpha_slow_, alpha_fast_,
-    (pf_init_model_fn_t)AmclNode::uniformPoseGenerator,
-    reinterpret_cast<void *>(map_));
+    (pf_init_model_fn_t)AmclNode::uniformPoseGenerator);
   pf_->pop_err = pf_err_;
   pf_->pop_z = pf_z_;
 

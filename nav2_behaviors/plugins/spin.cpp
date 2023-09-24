@@ -13,19 +13,13 @@
 // limitations under the License.
 
 #include <cmath>
-#include <chrono>
-#include <ctime>
 #include <thread>
 #include <algorithm>
 #include <memory>
 #include <utility>
 
-#include "spin.hpp"
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
+#include "nav2_behaviors/plugins/spin.hpp"
 #include "tf2/utils.h"
-#pragma GCC diagnostic pop
-#include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "nav2_util/node_utils.hpp"
 
@@ -37,13 +31,17 @@ namespace nav2_behaviors
 Spin::Spin()
 : TimedBehavior<SpinAction>(),
   feedback_(std::make_shared<SpinAction::Feedback>()),
-  prev_yaw_(0.0)
+  min_rotational_vel_(0.0),
+  max_rotational_vel_(0.0),
+  rotational_acc_lim_(0.0),
+  cmd_yaw_(0.0),
+  prev_yaw_(0.0),
+  relative_yaw_(0.0),
+  simulate_ahead_time_(0.0)
 {
 }
 
-Spin::~Spin()
-{
-}
+Spin::~Spin() = default;
 
 void Spin::onConfigure()
 {
@@ -73,15 +71,15 @@ void Spin::onConfigure()
   node->get_parameter("rotational_acc_lim", rotational_acc_lim_);
 }
 
-Status Spin::onRun(const std::shared_ptr<const SpinAction::Goal> command)
+ResultStatus Spin::onRun(const std::shared_ptr<const SpinActionGoal> command)
 {
   geometry_msgs::msg::PoseStamped current_pose;
   if (!nav2_util::getCurrentPose(
-      current_pose, *tf_, global_frame_, robot_base_frame_,
+      current_pose, *tf_, local_frame_, robot_base_frame_,
       transform_tolerance_))
   {
     RCLCPP_ERROR(logger_, "Current robot pose is not available.");
-    return Status::FAILED;
+    return ResultStatus{Status::FAILED, SpinActionResult::TF_ERROR};
   }
 
   prev_yaw_ = tf2::getYaw(current_pose.pose.orientation);
@@ -95,10 +93,10 @@ Status Spin::onRun(const std::shared_ptr<const SpinAction::Goal> command)
   command_time_allowance_ = command->time_allowance;
   end_time_ = steady_clock_.now() + command_time_allowance_;
 
-  return Status::SUCCEEDED;
+  return ResultStatus{Status::SUCCEEDED, SpinActionResult::NONE};
 }
 
-Status Spin::onCycleUpdate()
+ResultStatus Spin::onCycleUpdate()
 {
   rclcpp::Duration time_remaining = end_time_ - steady_clock_.now();
   if (time_remaining.seconds() < 0.0 && command_time_allowance_.seconds() > 0.0) {
@@ -106,16 +104,16 @@ Status Spin::onCycleUpdate()
     RCLCPP_WARN(
       logger_,
       "Exceeded time allowance before reaching the Spin goal - Exiting Spin");
-    return Status::FAILED;
+    return ResultStatus{Status::FAILED, SpinActionResult::TIMEOUT};
   }
 
   geometry_msgs::msg::PoseStamped current_pose;
   if (!nav2_util::getCurrentPose(
-      current_pose, *tf_, global_frame_, robot_base_frame_,
+      current_pose, *tf_, local_frame_, robot_base_frame_,
       transform_tolerance_))
   {
     RCLCPP_ERROR(logger_, "Current robot pose is not available.");
-    return Status::FAILED;
+    return ResultStatus{Status::FAILED, SpinActionResult::TF_ERROR};
   }
 
   const double current_yaw = tf2::getYaw(current_pose.pose.orientation);
@@ -128,13 +126,13 @@ Status Spin::onCycleUpdate()
   relative_yaw_ += delta_yaw;
   prev_yaw_ = current_yaw;
 
-  feedback_->angular_distance_traveled = relative_yaw_;
+  feedback_->angular_distance_traveled = static_cast<float>(relative_yaw_);
   action_server_->publish_feedback(feedback_);
 
   double remaining_yaw = abs(cmd_yaw_) - abs(relative_yaw_);
   if (remaining_yaw < 1e-6) {
     stopRobot();
-    return Status::SUCCEEDED;
+    return ResultStatus{Status::SUCCEEDED, SpinActionResult::NONE};
   }
 
   double vel = sqrt(2 * rotational_acc_lim_ * remaining_yaw);
@@ -151,12 +149,12 @@ Status Spin::onCycleUpdate()
   if (!isCollisionFree(relative_yaw_, cmd_vel.get(), pose2d)) {
     stopRobot();
     RCLCPP_WARN(logger_, "Collision Ahead - Exiting Spin");
-    return Status::FAILED;
+    return ResultStatus{Status::FAILED, SpinActionResult::COLLISION_AHEAD};
   }
 
   vel_pub_->publish(std::move(cmd_vel));
 
-  return Status::RUNNING;
+  return ResultStatus{Status::RUNNING, SpinActionResult::NONE};
 }
 
 bool Spin::isCollisionFree(
@@ -180,7 +178,7 @@ bool Spin::isCollisionFree(
       break;
     }
 
-    if (!collision_checker_->isCollisionFree(pose2d, fetch_data)) {
+    if (!local_collision_checker_->isCollisionFree(pose2d, fetch_data)) {
       return false;
     }
     fetch_data = false;
