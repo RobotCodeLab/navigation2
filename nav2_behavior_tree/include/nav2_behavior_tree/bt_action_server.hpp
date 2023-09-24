@@ -21,9 +21,11 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav2_behavior_tree/behavior_tree_engine.hpp"
-#include "nav2_behavior_tree/ros_topic_logger.hpp"
+// #include "nav2_behavior_tree/ros_topic_logger.hpp"
 #include "nav2_util/lifecycle_node.hpp"
 #include "nav2_util/simple_action_server.hpp"
+
+#include "behaviortree_cpp_v3_ros2_publisher/bt_ros_publisher.hpp"
 
 namespace nav2_behavior_tree
 {
@@ -239,7 +241,8 @@ protected:
   rclcpp::Logger logger_{rclcpp::get_logger("BtActionServer")};
 
   // To publish BT logs
-  std::unique_ptr<RosTopicLogger> topic_logger_;
+  // std::unique_ptr<RosTopicLogger> topic_logger_;
+  std::unique_ptr<BTRosPublisher> topic_logger_;
 
   // Duration for each iteration of BT execution
   std::chrono::milliseconds bt_loop_duration_;

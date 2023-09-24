@@ -236,7 +236,8 @@ bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filena
     return false;
   }
 
-  topic_logger_ = std::make_unique<RosTopicLogger>(client_node_, tree_);
+  // topic_logger_ = std::make_unique<RosTopicLogger>(client_node_, tree_);
+  topic_logger_ = std::make_unique<BTRosPublisher>(client_node_, tree_, filename);
 
   current_bt_xml_filename_ = filename;
   return true;

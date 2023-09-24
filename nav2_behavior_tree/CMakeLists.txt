@@ -17,6 +17,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(nav2_util REQUIRED)
+find_package(behaviortree_cpp_v3_ros2_publisher REQUIRED)
 
 nav2_package()
 
@@ -41,6 +42,7 @@ set(dependencies
   std_msgs
   std_srvs
   nav2_util
+  behaviortree_cpp_v3_ros2_publisher
 )
 
 add_library(${library_name} SHARED
