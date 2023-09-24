@@ -1,6 +1,7 @@
-## This is a modified version of Nav2 which was utilized by [Canopy](https://github.com/RobotCodeLab/BT-Canopy) in a case of the Nav2 Behavior Tree. See the Galactic Branch
-
 # Nav2
+
+## This is a modified version of Nav2 which was utilized by [Canopy](https://github.com/RobotCodeLab/BT-Canopy) in a case study of the Nav2 Behavior Tree. See the Iron branch for the changes specifically used in the case study.
+
 [![GitHub Workflow Status](https://github.com/ros-planning/navigation2/actions/workflows/update_ci_image.yaml/badge.svg)](https://github.com/ros-planning/navigation2/actions/workflows/update_ci_image.yaml)
 [![codecov](https://codecov.io/gh/ros-planning/navigation2/branch/main/graph/badge.svg?token=S3iRmypwlg)](https://codecov.io/gh/ros-planning/navigation2)
 
