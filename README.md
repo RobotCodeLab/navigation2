@@ -1,4 +1,16 @@
 # Nav2
+
+## This is a modified version of Nav2 which was utilized by [Canopy](https://github.com/RobotCodeLab/BT-Canopy) in a case study of the Nav2 Behavior Tree. The following files were modified to support Canopy.
+
+- [nav2\_behavior\_tree/CMakeLists.txt](https://github.com/RobotCodeLab/navigation2/blob/iron/nav2_behavior_tree/CMakeLists.txt)
+- [nav2\_behavior\_tree/package.xml](https://github.com/RobotCodeLab/navigation2/blob/iron/nav2_behavior_tree/package.xml)
+- [nav2\_behavior\_tree/include/nav2\_behavior\_tree/bt\_action\_server.hpp](https://github.com/RobotCodeLab/navigation2/blob/iron/nav2_behavior_tree/include/nav2_behavior_tree/bt_action_server.hpp)
+- [nav2\_behavior\_tree/include/nav2\_behavior\_tree/bt\_action\_server\_impl.hpp](https://github.com/RobotCodeLab/navigation2/blob/iron/nav2_behavior_tree/include/nav2_behavior_tree/bt_action_server_impl.hpp)
+- [nav2\_bt\_navigator/CMakeLists.txt](https://github.com/RobotCodeLab/navigation2/blob/iron/nav2_bt_navigator/CMakeLists.txt)
+- [nav2\_bt\_navigator/package.xml](https://github.com/RobotCodeLab/navigation2/blob/iron/nav2_bt_navigator/package.xml)
+
+The exact changes can be seen in [this commit](https://github.com/RobotCodeLab/navigation2/commit/7acd4e8bcdf8a4d0175872a29d407d25e10376a5).
+
 [![GitHub Workflow Status](https://github.com/ros-planning/navigation2/actions/workflows/update_ci_image.yaml/badge.svg)](https://github.com/ros-planning/navigation2/actions/workflows/update_ci_image.yaml)
 [![codecov](https://codecov.io/gh/ros-planning/navigation2/branch/main/graph/badge.svg?token=S3iRmypwlg)](https://codecov.io/gh/ros-planning/navigation2)
 
